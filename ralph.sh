@@ -21,6 +21,7 @@ MAX_ITERATIONS=1000        # hard ceiling on loop turns
 MAX_TURNS=120              # agent turns inside ONE iteration
 TASKS_PER_ITERATION=1      # keep at 1-3; higher = bigger context = worse
 MAX_STALLS=3               # consecutive no-progress iterations before stopping
+PLAN_GUARD=strict          # strict = stop if an iteration deletes/renames tasks
 VERIFY_CMD=""              # e.g. "npm run typecheck && npm test"
 MODEL=""                   # e.g. "opus" / "sonnet"; empty = account default
 PERMISSION_MODE="acceptEdits"
@@ -163,6 +164,73 @@ report_denials() {
   fi
 }
 
+# ------------------------------------------------------- plan integrity ------
+# An iteration is allowed to tick a box and to split a task into new ones.
+# It is NOT allowed to delete a task or reword an existing one: task IDs are
+# permanent identifiers that progress.md, blockers.md and commit messages all
+# point at. Renumbering silently rewrites that history, and an agent that can
+# delete tasks can reach "plan complete" by emptying the plan — which would
+# make the loop's own stop condition meaningless.
+#
+# Snapshot format: "<id>\t<description>", one per line.
+plan_snapshot() {
+  sed -nE 's/^[[:space:]]*-[[:space:]]\[[ xX]\][[:space:]]*(T[0-9]+[A-Za-z]*)[[:space:]]*(—|-|:)?[[:space:]]*(.*)$/\1\t\3/p' "$PLAN"
+}
+
+# Prints violations, one per line. Empty output means the plan is intact.
+plan_violations() {
+  local before="$1" after="$2"
+  awk -F'\t' '
+    NR==FNR { desc[$1] = $2; next }
+    { now[$1] = $2 }
+    END {
+      for (id in desc) {
+        if (!(id in now))            print "deleted: " id " — " desc[id]
+        else if (now[id] != desc[id]) print "reworded: " id
+      }
+    }
+  ' "$before" "$after" | sort
+}
+
+check_plan_integrity() {
+  local before="$1" after="$2" v
+  v="$(plan_violations "$before" "$after")"
+  [[ -z "$v" ]] && return 0
+
+  log "PLAN TAMPERING DETECTED — the iteration changed tasks it may only tick:"
+  while IFS= read -r line; do [[ -n "$line" ]] && log "  $line"; done <<<"$v"
+
+  if [[ "$PLAN_GUARD" == "strict" ]]; then
+    log "Stopping (PLAN_GUARD=strict). Restore the plan, then rerun:"
+    log "  git diff HEAD~1 -- $PLAN      # see what the iteration did"
+    log "  git checkout HEAD~1 -- $PLAN  # or restore it wholesale, re-ticking done tasks"
+    log "Set PLAN_GUARD=warn in $RALPH_DIR/config.sh to log this and keep going."
+    return 1
+  fi
+  log "Continuing anyway (PLAN_GUARD=warn) — scope may have been lost silently."
+  return 0
+}
+
+# Run once at startup. A duplicated task wastes an iteration and tempts the
+# agent into "tidying" the plan, which is what PLAN_GUARD then halts on.
+lint_plan() {
+  local dup_ids dup_desc n
+  n="$(plan_snapshot | wc -l)"
+  dup_ids="$(plan_snapshot | cut -f1 | sort | uniq -d)"
+  dup_desc="$(plan_snapshot | cut -f2 | sort | uniq -d)"
+  log "plan: $n task(s)"
+  if [[ -n "$dup_ids" ]]; then
+    log "PLAN LINT: duplicate task ids — progress.md could not refer to them unambiguously:"
+    while IFS= read -r x; do log "  $x"; done <<<"$dup_ids"
+  fi
+  if [[ -n "$dup_desc" ]]; then
+    log "PLAN LINT: $(wc -l <<<"$dup_desc") duplicated task description(s), e.g.:"
+    log "  $(head -1 <<<"$dup_desc" | cut -c1-80)..."
+    log "  -> resolve by hand: delete the duplicate LINE and leave the id gap."
+    log "     Do not renumber; ids are referenced by progress.md and commit messages."
+  fi
+}
+
 # ------------------------------------------------------------- one iteration --
 run_iteration() {
   local n="$1"
@@ -205,6 +273,7 @@ run_iteration() {
 log "=============================================================="
 log "ralph start — $(open_tasks) open tasks, HEAD $(head_sha)"
 log "config: max_turns=$MAX_TURNS tasks/iter=$TASKS_PER_ITERATION verify='${VERIFY_CMD:-none}'"
+lint_plan
 
 stalls=0
 limit_waits=0
@@ -220,6 +289,9 @@ for (( i=1; i<=MAX_ITERATIONS; i++ )); do
 
   before_sha="$(head_sha)"
   before_open="$remaining"
+  plan_before="$LOG_DIR/.plan-before"
+  plan_after="$LOG_DIR/.plan-after"
+  plan_snapshot > "$plan_before"
   log "--- iteration $i/$MAX_ITERATIONS — $remaining task(s) open, HEAD $before_sha"
 
   run_iteration "$i"
@@ -241,6 +313,9 @@ for (( i=1; i<=MAX_ITERATIONS; i++ )); do
   fi
 
   [[ "$rc" -ne 0 ]] && log "claude exited with code $rc (see $iter_log)"
+
+  plan_snapshot > "$plan_after"
+  check_plan_integrity "$plan_before" "$plan_after" || exit 12
 
   after_sha="$(head_sha)"
   after_open="$(open_tasks)"

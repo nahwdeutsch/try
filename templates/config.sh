@@ -15,6 +15,11 @@ TASKS_PER_ITERATION=1
 # Consecutive iterations with no commit and no completed task before giving up.
 MAX_STALLS=3
 
+# What to do when an iteration deletes, rewords or renumbers a task:
+#   strict = stop the loop (default — silent scope loss is worse than a halt)
+#   warn   = log it loudly and keep going
+PLAN_GUARD=strict
+
 # "" = account default. "opus" for hard work, "sonnet" to stretch the quota.
 MODEL=""
 

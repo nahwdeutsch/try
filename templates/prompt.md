@@ -28,10 +28,23 @@ Pick the **first {{TASKS_PER_ITERATION}} unchecked `- [ ]` task(s)** in
 - If every task is checked: create the file `.ralph/DONE`, write a short
   completion summary into `.ralph/progress.md`, commit, and stop.
 - If the next task is too large to finish and verify in this iteration:
-  split it in `plan.md` into smaller sub-tasks, commit that edit, and then
-  implement only the first sub-task.
+  split it by ADDING new sub-task lines with suffixed ids (`T042a`, `T042b`)
+  and ticking the original only once all of them are done. Commit that edit,
+  then implement the first sub-task.
 
 Do **not** re-plan the whole project. The plan already exists.
+
+**Task ids are permanent.** `progress.md`, `blockers.md` and every commit
+message point at them. You may only:
+- change `- [ ]` to `- [x]` on an existing task, or
+- append new tasks with new ids.
+
+You may **never** delete a task, reword an existing task, or renumber tasks —
+not even to close a gap left by a task you think is unnecessary or already
+covered. If a task looks wrong, out of scope, or redundant, leave it
+untouched, note it in `.ralph/blockers.md` for a human to decide, and move to
+the next one. The loop verifies this after every iteration and stops if the
+plan was rewritten.
 
 ## Step 3 — Implement
 
@@ -81,7 +94,8 @@ iteration with a clean context, which is the entire point.
 
 - Never mark a task complete without running the verification command.
 - Never delete or rewrite working functionality to make a task easier.
-- Never rewrite `.ralph/plan.md` wholesale; only tick boxes or split tasks.
+- Never delete, reword, or renumber a task in `.ralph/plan.md`. Tick boxes and
+  append sub-tasks only.
 - Never `git push --force`, never rewrite pushed history.
 - If you are blocked by something only a human can answer, write it to
   `.ralph/blockers.md`, commit, and stop. Do not guess and build on the guess.
