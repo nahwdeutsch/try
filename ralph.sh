@@ -110,9 +110,13 @@ limit_status() {
   local jsonl="$1" err="$2" verdict=""
 
   if [[ -s "$jsonl" ]]; then
+    # status is "allowed" while requests are being served and "allowed_warning"
+    # when the quota is merely close to its cap — neither blocks anything, so
+    # only a status that does NOT start with "allowed" counts as limited.
+    # Treating the warning as a stop wastes the rest of the window.
     verdict="$(jq -rs '
         [ .. | objects | select(has("status") and has("resetsAt")) ] as $rl
-        | ([ $rl[] | select(.status != "allowed") ] | first) as $hit
+        | ([ $rl[] | select(.status | startswith("allowed") | not) ] | first) as $hit
         | ([ .. | objects | .api_error_status? // empty ] | map(select(. == 429)) | length) as $e429
         | if $hit    then "LIMITED \($hit.resetsAt // 0)"
           elif $e429 > 0 then "LIMITED 0"
@@ -148,6 +152,18 @@ wait_for_reset() {
   fi
   log "sleeping ${secs}s — state is on disk and in git, nothing is lost"
   sleep "$secs"
+}
+
+# Surface how close the quota is to its cap, so an approaching stop is not a
+# surprise. This is informational only — it never stops the loop.
+report_quota() {
+  local jsonl="$1" u
+  [[ -s "$jsonl" ]] || return 0
+  u="$(jq -rs '[ .. | objects | select(has("status") and has("utilization")) | .utilization ]
+               | max // empty' "$jsonl" 2>/dev/null)"
+  [[ -z "$u" || "$u" == "null" ]] && return 0
+  awk -v u="$u" 'BEGIN { exit !(u >= 0.8) }' && log "quota utilization: $(awk -v u="$u" 'BEGIN{printf "%.0f%%", u*100}')"
+  return 0
 }
 
 # A tool the agent asked for but was not allowed is the quietest way for a run
@@ -300,6 +316,7 @@ for (( i=1; i<=MAX_ITERATIONS; i++ )); do
 
   iter_err="$LOG_DIR/iter-$(printf '%03d' "$i").err"
   report_denials "$iter_log"
+  report_quota "$iter_log"
   read -r lim_verdict lim_epoch <<<"$(limit_status "$iter_log" "$iter_err")"
   if [[ "$lim_verdict" == "LIMITED" ]]; then
     if [[ "$limit_waits" -ge "$MAX_LIMIT_WAITS" ]]; then
