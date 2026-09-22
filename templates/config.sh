@@ -35,10 +35,20 @@ PERMISSION_MODE="acceptEdits"
 ALLOWED_TOOLS=(
   Read Write Edit Glob Grep TodoWrite
   "Bash(git add:*)" "Bash(git commit:*)" "Bash(git status:*)"
-  "Bash(git log:*)" "Bash(git diff:*)" "Bash(git rev-parse:*)"
+  "Bash(git log:*)" "Bash(git diff:*)" "Bash(git rev-parse:*)" "Bash(git show:*)"
+  # Read-only navigation. The agent reaches for these constantly; without them
+  # it burns a turn per refusal. They grant nothing it lacks — it already has
+  # Write and Edit — and the plan is protected by PLAN_GUARD, not by this list.
+  "Bash(grep:*)" "Bash(awk:*)" "Bash(head:*)" "Bash(tail:*)"
+  "Bash(wc:*)" "Bash(find:*)" "Bash(ls:*)" "Bash(cat:*)"
   # --- add what your verification command needs, e.g.: ---
   "Bash(npm:*)" "Bash(npx:*)"
 )
+
+# Deliberately NOT listed: "Bash(sed -i:*)" and other in-place rewriters.
+# Not because they are dangerous — Edit can change the same files — but because
+# an iteration that edits the plan through Edit leaves a reviewable diff, and
+# the refusal nudges it there.
 
 # Seconds to wait when a usage limit is hit and no reset time was reported.
 LIMIT_WAIT_SECONDS=1800
