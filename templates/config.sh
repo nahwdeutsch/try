@@ -40,12 +40,13 @@ ALLOWED_TOOLS=(
   # it burns a turn per refusal. They grant nothing it lacks — it already has
   # Write and Edit — and the plan is protected by PLAN_GUARD, not by this list.
   "Bash(grep:*)" "Bash(awk:*)" "Bash(head:*)" "Bash(tail:*)"
-  "Bash(wc:*)" "Bash(find:*)" "Bash(ls:*)" "Bash(cat:*)"
+  "Bash(wc:*)" "Bash(find:*)" "Bash(ls:*)" "Bash(cat:*)" "Bash(sed -n:*)"
   # --- add what your verification command needs, e.g.: ---
   "Bash(npm:*)" "Bash(npx:*)"
 )
 
-# Deliberately NOT listed: "Bash(sed -i:*)" and other in-place rewriters.
+# `sed -n` (print mode) is listed above; plain `sed` and `sed -i` are not.
+# Deliberately NOT listed: in-place rewriters.
 # Not because they are dangerous — Edit can change the same files — but because
 # an iteration that edits the plan through Edit leaves a reviewable diff, and
 # the refusal nudges it there.

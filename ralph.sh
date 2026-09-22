@@ -33,7 +33,8 @@ ALLOWED_TOOLS=(Read Write Edit Glob Grep TodoWrite
                "Bash(git add:*)" "Bash(git commit:*)" "Bash(git status:*)"
                "Bash(git log:*)" "Bash(git diff:*)" "Bash(git rev-parse:*)"
                "Bash(git show:*)" "Bash(grep:*)" "Bash(awk:*)" "Bash(head:*)"
-               "Bash(tail:*)" "Bash(wc:*)" "Bash(find:*)" "Bash(ls:*)" "Bash(cat:*)")
+               "Bash(tail:*)" "Bash(wc:*)" "Bash(find:*)" "Bash(ls:*)" "Bash(cat:*)"
+               "Bash(sed -n:*)")
 LIMIT_WAIT_SECONDS=1800    # fallback wait when reset time can't be parsed
 MAX_LIMIT_WAITS=0          # 0 = never sleep, exit instead (default: stop clean)
 COOLDOWN_SECONDS=5         # pause between iterations
