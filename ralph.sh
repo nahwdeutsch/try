@@ -62,8 +62,12 @@ done
 PLAN="$RALPH_DIR/plan.md"
 PROGRESS="$RALPH_DIR/progress.md"
 PROMPT="$RALPH_DIR/prompt.md"
-LOG_DIR="$RALPH_DIR/logs"
-RUN_LOG="$LOG_DIR/ralph.log"
+# Iteration numbering restarts with every run, so per-iteration logs go under a
+# per-run directory. Without this a resume silently overwrites the logs of the
+# run that hit the usage limit — exactly the ones worth reading afterwards.
+RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)"
+LOG_DIR="$RALPH_DIR/logs/$RUN_ID"
+RUN_LOG="$RALPH_DIR/logs/ralph.log"
 
 # ------------------------------------------------------------------- utils ---
 ts()  { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
@@ -291,6 +295,7 @@ run_iteration() {
 # ------------------------------------------------------------------ main -----
 log "=============================================================="
 log "ralph start — $(open_tasks) open tasks, HEAD $(head_sha)"
+log "run id: $RUN_ID (iteration logs in $LOG_DIR)"
 log "config: max_turns=$MAX_TURNS tasks/iter=$TASKS_PER_ITERATION verify='${VERIFY_CMD:-none}'"
 lint_plan
 
